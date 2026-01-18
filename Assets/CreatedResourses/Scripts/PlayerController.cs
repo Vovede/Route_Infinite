@@ -1,27 +1,30 @@
 ﻿using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering.Universal;
 
 public class PlayerController : MonoBehaviour
 {
     [Header("Speed statistics")]
-    [SerializeField] private float currentSpeed;
     [SerializeField] private float walkSpeed = 5f;
     [SerializeField] private float sprintSpeed = 8f;
-    [SerializeField] private float airControl = 0.5f; // How much control you have in air
+    [ReadOnlyInspector] public float currentSpeed;
 
     private CharacterController _characterController;
     private CinemachineCamera _cinemachineCamera;
     private Vector2 _move;
+    [ReadOnlyInspector] public bool _isWalking;
+    [ReadOnlyInspector] public bool _isSprinting;
 
     [Header("Jump statistics")]
     [SerializeField] private float _jumpHeight = 3f;
-    private Vector3 _velocity;
+    [SerializeField] private float airControl = 0.5f;
     [SerializeField][ReadOnlyInspector] private float _gravityForce = -15f;
+    private Vector3 _velocity;
 
     [Header("Jump Enhancements")]
-    [SerializeField] private float coyoteTime = 0.2f; // Allows jumping slightly after leaving edge
-    [SerializeField] private float jumpBufferTime = 0.2f; // Allows pressing jump before landing
+    [SerializeField] private float coyoteTime = 0.2f;
+    [SerializeField] private float jumpBufferTime = 0.2f;
 
     private float _coyoteTimeCounter;
     private float _jumpBufferCounter;
@@ -32,7 +35,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform _checkerPosition;
     [SerializeField] private float _checkRadius = 0.4f;
     [SerializeField] private LayerMask _groundLayers;
-    [SerializeField][ReadOnlyInspector] private bool _isGrounded;
+    [ReadOnlyInspector] public bool _isGrounded;
 
     private void Awake()
     {
@@ -49,7 +52,18 @@ public class PlayerController : MonoBehaviour
 
     public void OnMove(InputValue inputValue)
     {
-        _move = inputValue.Get<Vector2>();
+        if (inputValue.Get<Vector2>() != Vector2.zero)
+        {
+            _move = inputValue.Get<Vector2>();
+            currentSpeed = walkSpeed;
+            _isWalking = true;
+        }
+        else
+        {
+            _move = Vector2.zero;
+            currentSpeed = 0;
+            _isWalking = false;
+        }
     }
 
     public void OnSprint(InputValue inputValue)
@@ -57,10 +71,12 @@ public class PlayerController : MonoBehaviour
         if (inputValue.isPressed)
         {
             currentSpeed = sprintSpeed;
+            _isSprinting = true;
         }
         else
         {
             currentSpeed = walkSpeed;
+            _isSprinting = false;
         }
     }
 
@@ -89,18 +105,16 @@ public class PlayerController : MonoBehaviour
     {
         _isGrounded = Physics.CheckSphere(_checkerPosition.position, _checkRadius, _groundLayers);
 
-        // Coyote time logic
         if (_isGrounded)
         {
             _coyoteTimeCounter = coyoteTime;
-            _isJumping = false; // Reset jumping state when grounded
+            _isJumping = false;
         }
         else
         {
             _coyoteTimeCounter -= Time.deltaTime;
         }
 
-        // Reset jump buffer if we're grounded and not trying to jump
         if (_isGrounded && !_jumpPressed)
         {
             _jumpBufferCounter = 0;
@@ -113,28 +127,22 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJumpLogic()
     {
-        // Reset velocity when grounded
         if (_isGrounded && _velocity.y < 0)
         {
             _velocity.y = -2f;
         }
 
-        // Perform jump if conditions are met
         if (_jumpBufferCounter > 0 && _coyoteTimeCounter > 0 && !_isJumping)
         {
             _velocity.y = Mathf.Sqrt(_jumpHeight * -2f * _gravityForce);
             _jumpBufferCounter = 0;
             _coyoteTimeCounter = 0;
             _isJumping = true;
-
-            // Debug jump
-            // Debug.Log("Jump executed!");
         }
     }
 
     private void ApplyGravity()
     {
-        // Apply gravity if not grounded
         if (!_isGrounded)
         {
             _velocity.y += _gravityForce * Time.deltaTime;
@@ -143,20 +151,14 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMovement()
     {
-        // Calculate speed multiplier (less control in air)
         float speedMultiplier = _isGrounded ? 1f : airControl;
 
-        // Calculate movement vectors
         Vector3 horizontalMovement = (GetForward() * _move.y + GetRight() * _move.x) * currentSpeed * speedMultiplier;
 
-        // Combine horizontal and vertical movement
         Vector3 finalMovement = new Vector3(horizontalMovement.x, _velocity.y, horizontalMovement.z);
 
-        // Apply movement
         _characterController.Move(finalMovement * Time.deltaTime);
 
-        // Debug info (optional)
-        // Debug.Log($"Grounded: {_isGrounded}, VelocityY: {_velocity.y:F2}, Coyote: {_coyoteTimeCounter:F2}, Buffer: {_jumpBufferCounter:F2}");
     }
 
     public Vector3 GetForward()
@@ -171,15 +173,5 @@ public class PlayerController : MonoBehaviour
         Vector3 right = _cinemachineCamera.transform.right;
         right.y = 0f;
         return right.normalized;
-    }
-
-    // Optional: Visualize ground check sphere in editor
-    private void OnDrawGizmosSelected()
-    {
-        if (_checkerPosition != null)
-        {
-            Gizmos.color = _isGrounded ? Color.green : Color.red;
-            Gizmos.DrawWireSphere(_checkerPosition.position, _checkRadius);
-        }
     }
 }
