@@ -2,42 +2,45 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Splines;
 
+[RequireComponent(typeof(Rigidbody))]
 public class FollowRail : MonoBehaviour
 {
-    [SerializeField] private SplineContainer _splineContainer;
+    [SerializeField] private SplineContainer rail;
 
-    [SerializeField] private VehicleType _vehicleType;
+    private Spline currentSpline;
 
-    [ReadOnlyInspector] public float _currentSpeed;
+    private Rigidbody rb;
 
-    private float3 previousNearest = float3.zero;
-
-    private void Update()
+    private void Start()
     {
-        var localPoint = _splineContainer.transform.InverseTransformPoint(transform.position);
+        rb = GetComponent<Rigidbody>();
 
-        SplineUtility.GetNearestPoint(_splineContainer.Spline, localPoint, out var nearest, out var ratio);
-
-        var tangent = SplineUtility.EvaluateTangent(_splineContainer.Spline, ratio);
-
-        var rotation = Quaternion.LookRotation(tangent);
-        transform.rotation = rotation;
-        
-        if (Vector3.SqrMagnitude(previousNearest - nearest) >= 0.0001)
-        {
-            var globalNearest = _splineContainer.transform.TransformPoint(nearest);
-            var perpendicular = Vector3.Cross(tangent, Vector3.up);
-            var position = globalNearest + perpendicular.normalized;
-            transform.position = position;
-
-            previousNearest = nearest;
-        }
-        
-        transform.Translate(Vector3.forward * _currentSpeed * Time.deltaTime, Space.Self);
+        currentSpline = rail.Splines[0];
     }
 
-    private enum VehicleType 
-    { 
-        trolley, train
+    private void FixedUpdate()
+    {
+        var native = new NativeSpline(currentSpline, rail.transform.localToWorldMatrix);
+        float distance = SplineUtility.GetNearestPoint(native, transform.position, out float3 nearest, out float t);
+
+        transform.position = nearest;
+
+        Vector3 forward = Vector3.Normalize(native.EvaluateTangent(t));
+        Vector3 up = native.EvaluateUpVector(t);
+
+        var remappedForward = new Vector3(0, 0, 1);
+        var remappedUp = new Vector3(0, 1, 0);
+        var axisRemapRotation = Quaternion.Inverse(Quaternion.LookRotation(remappedForward, remappedUp));
+
+        transform.rotation = Quaternion.LookRotation(forward, up) * axisRemapRotation;
+
+        Vector3 engineForward = transform.forward;
+
+        if (Vector3.Dot(rb.linearVelocity, transform.forward) < 0)
+        {
+            engineForward *= -1;
+        }
+
+        rb.linearVelocity = rb.linearVelocity.magnitude * engineForward;
     }
 }
