@@ -40,8 +40,8 @@ public class Trolley : MonoBehaviour
         if (_ableToThrottle)
         {
             int facing = (_facingForward ? 1 : -1);
-            Vector3 dir = facing * _force * 100 * transform.forward;
-            _rb.AddForce(dir);
+            Vector3 dir = facing * _force * transform.forward;
+            _rb.AddForce(dir, ForceMode.Impulse);
         } //TODO create normal settings for accelerating and speed control
     }
 

@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 public class InteractionController : MonoBehaviour
 {
     [SerializeField] private float _interactionReach = 3f;
+    [SerializeField][ReadOnlyInspector] private bool _busyInteracting = false;
 
     InteractableObject currentInteractableObject;
 
@@ -25,13 +26,35 @@ public class InteractionController : MonoBehaviour
         {
             if (currentInteractableObject != null)
             {
+                if (currentInteractableObject.isContinousInteraction)
+                {
+                    _busyInteracting = true;
+                    DisableHUDWhenBusy();
+                }
                 currentInteractableObject.Interact();
+            }
+        }
+    }
+
+    public void OnDiscard(InputValue inputValue)
+    {
+        if (inputValue.isPressed)
+        {
+            if (currentInteractableObject != null)
+            {
+                if (_busyInteracting)
+                {
+                    currentInteractableObject.Discard();
+                    _busyInteracting = false;
+                }
             }
         }
     }
 
     private void CheckForInteractableObject()
     {
+        if (_busyInteracting) return;
+
         Ray interactionRay = new Ray(_camera.transform.position, _camera.transform.forward);
         if (Physics.Raycast(interactionRay, out RaycastHit hitInfo, _interactionReach))
         {
@@ -61,6 +84,15 @@ public class InteractionController : MonoBehaviour
         else
         {
             DisableCurrentInteractableObject();
+        }
+    }
+
+    private void DisableHUDWhenBusy()
+    {
+        HUDcontroller.instance.DisableInteractionText();
+        if (currentInteractableObject)
+        {
+            currentInteractableObject.DisableOutline();
         }
     }
 

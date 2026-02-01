@@ -37,6 +37,10 @@ public class PlayerMovementController : MonoBehaviour
     [ReadOnlyInspector] public bool _isGrounded;
     [ReadOnlyInspector] public bool _isOnMovingPlatform;
 
+    [Header("Abilities")]
+    public bool _canMove = true;
+    public bool _canJump = true;
+
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
@@ -52,44 +56,53 @@ public class PlayerMovementController : MonoBehaviour
 
     public void OnMove(InputValue inputValue)
     {
-        if (inputValue.Get<Vector2>() != Vector2.zero)
+        if (_canMove)
         {
-            _move = inputValue.Get<Vector2>();
-            currentSpeed = walkSpeed;
-            _isWalking = true;
-        }
-        else
-        {
-            _move = Vector2.zero;
-            currentSpeed = 0;
-            _isWalking = false;
+            if (inputValue.Get<Vector2>() != Vector2.zero)
+            {
+                _move = inputValue.Get<Vector2>();
+                currentSpeed = walkSpeed;
+                _isWalking = true;
+            }
+            else
+            {
+                _move = Vector2.zero;
+                currentSpeed = 0;
+                _isWalking = false;
+            }
         }
     }
 
     public void OnSprint(InputValue inputValue)
     {
-        if (inputValue.isPressed)
+        if (_canMove)
         {
-            currentSpeed = sprintSpeed;
-            _isSprinting = true;
-        }
-        else
-        {
-            currentSpeed = walkSpeed;
-            _isSprinting = false;
+            if (inputValue.isPressed)
+            {
+                currentSpeed = sprintSpeed;
+                _isSprinting = true;
+            }
+            else
+            {
+                currentSpeed = walkSpeed;
+                _isSprinting = false;
+            }
         }
     }
 
     public void OnJump(InputValue inputValue)
     {
-        if (inputValue.isPressed)
+        if (_canJump)
         {
-            _jumpPressed = true;
-            _jumpBufferCounter = jumpBufferTime;
-        }
-        else
-        {
-            _jumpPressed = false;
+            if (inputValue.isPressed)
+            {
+                _jumpPressed = true;
+                _jumpBufferCounter = jumpBufferTime;
+            }
+            else
+            {
+                _jumpPressed = false;
+            }
         }
     }
 
@@ -159,6 +172,11 @@ public class PlayerMovementController : MonoBehaviour
         Vector3 finalMovement = new(horizontalMovement.x, _velocity.y, horizontalMovement.z);
 
         _characterController.Move(finalMovement * Time.deltaTime);
+    }
+
+    public void InstantMove(Vector3 position)
+    {
+        _characterController.Move(position);
     }
 
     public Vector3 GetForward()

@@ -16,6 +16,7 @@ public class FollowRail : MonoBehaviour
         rb = GetComponent<Rigidbody>();
 
         currentSpline = rail.Splines[0];
+        //SpawnAtRails();
     }
 
     private void FixedUpdate()
@@ -43,4 +44,30 @@ public class FollowRail : MonoBehaviour
 
         rb.linearVelocity = rb.linearVelocity.magnitude * engineForward;
     }
+
+    //private void SpawnAtRails()
+    //{
+    //    var native = new NativeSpline(currentSpline, rail.transform.localToWorldMatrix);
+    //    float distance = SplineUtility.GetNearestPoint(native, transform.position, out float3 nearest, out float t);
+
+    //    transform.position = nearest;
+
+    //    Vector3 forward = Vector3.Normalize(native.EvaluateTangent(t));
+    //    Vector3 up = native.EvaluateUpVector(t);
+
+    //    var remappedForward = new Vector3(0, 0, 1);
+    //    var remappedUp = new Vector3(0, 1, 0);
+    //    var axisRemapRotation = Quaternion.Inverse(Quaternion.LookRotation(remappedForward, remappedUp));
+
+    //    transform.rotation = Quaternion.LookRotation(forward, up) * axisRemapRotation;
+
+    //    Vector3 engineForward = transform.forward;
+
+    //    if (Vector3.Dot(rb.linearVelocity, transform.forward) < 0)
+    //    {
+    //        engineForward *= -1;
+    //    }
+
+    //    rb.linearVelocity = rb.linearVelocity.magnitude * engineForward;
+    //}
 }
