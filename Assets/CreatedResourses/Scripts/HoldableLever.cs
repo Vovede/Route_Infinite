@@ -8,8 +8,10 @@ public class HoldableLever : MonoBehaviour
     [SerializeField] private Transform _lookPoint;
 
     [Header("Camera Clamp")]
-    [SerializeField] private float _yawClamp = 30f;
-    [SerializeField] private float _pitchClamp = 15f;
+    [SerializeField] private float _panClamp = 30f;   // left/right
+    [SerializeField] private float _tiltUpClamp = 20f;
+    [SerializeField] private float _tiltDownClamp = 10f;
+    [SerializeField][ReadOnlyInspector] private bool _isClamping = false;
 
     private PlayerMovementController _playerController;
     private GameObject _player;
@@ -17,12 +19,11 @@ public class HoldableLever : MonoBehaviour
     private CinemachineCamera _cmCamera;
     private CinemachinePanTilt _panTilt;
 
-    private float _originalYawMin;
-    private float _originalYawMax;
-    private float _originalPitchMin;
-    private float _originalPitchMax;
+    private float _centerPan;
+    private float _centerTilt;
 
     private bool _isHolding;
+    private bool _canHeadbob;
 
     private void Awake()
     {
@@ -31,6 +32,14 @@ public class HoldableLever : MonoBehaviour
 
         _cmCamera = FindFirstObjectByType<CinemachineCamera>();
         _panTilt = _cmCamera.GetComponent<CinemachinePanTilt>();
+
+        _canHeadbob = _cmCamera.GetComponent<Headbob>()._canHeadbob;
+    }
+
+    private void Update()
+    {
+        if (_isClamping) ClampCamera();
+        if (_isHolding) CaptureLeverPush();
     }
 
     public void StartInteraction()
@@ -40,16 +49,21 @@ public class HoldableLever : MonoBehaviour
 
         SnapToClosestStandpoint();
         RotatePlayerOnce();
-        //ClampCamera();
 
         _playerController.enabled = false;
         _isHolding = true;
+        _canHeadbob = false;
     }
 
     public void DiscardInteraction()
     {
-        _playerController.enabled = true;
-        _isHolding = false;
+        if (_isHolding)
+        {
+            _playerController.enabled = true;
+            _isHolding = false;
+            _isClamping = false;
+            _canHeadbob = true;
+        }
     }
 
     private void SnapToClosestStandpoint()
@@ -73,54 +87,76 @@ public class HoldableLever : MonoBehaviour
 
     private void RotatePlayerOnce()
     {
-        if (_lookPoint == null)
+        if (_lookPoint == null || _panTilt == null)
             return;
 
-        Vector3 dir = _lookPoint.position - _player.transform.position;
-        dir.y = 0f;
+        Vector3 dir = _lookPoint.position - _cmCamera.transform.position;
 
-        if (dir.sqrMagnitude > 0.001f)
-            _cmCamera.transform.rotation = Quaternion.LookRotation(dir);
+        if (dir.sqrMagnitude < 0.001f)
+            return;
+
+        // --- PLAYER ROTATION (flat) ---
+        Vector3 flatDir = dir;
+        flatDir.y = 0f;
+
+        if (flatDir.sqrMagnitude > 0.001f)
+            _player.transform.rotation = Quaternion.LookRotation(flatDir);
+
+        // --- CAMERA ROTATION (Pan/Tilt) ---
+
+        // Convert direction into local space of the player
+        Vector3 localDir = _player.transform.InverseTransformDirection(dir);
+
+        // Yaw: left/right
+        float yaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
+
+        // Pitch: up/down
+        float pitch = -Mathf.Asin(localDir.y) * Mathf.Rad2Deg + 10;
+
+        _panTilt.PanAxis.Value = yaw;
+        _panTilt.TiltAxis.Value = pitch;
+
+        _centerPan = _panTilt.PanAxis.Value;
+        _centerTilt = _panTilt.TiltAxis.Value;
+        _isClamping = true;
     }
+
 
     private void ClampCamera()
     {
         if (_panTilt == null)
             return;
 
-        // Save original limits
-        _originalYawMin = _panTilt.PanAxis.Range.x;
-        _originalYawMax = _panTilt.PanAxis.Range.y;
-        _originalPitchMin = _panTilt.TiltAxis.Range.x;
-        _originalPitchMax = _panTilt.TiltAxis.Range.y;
+        // --- PAN (left / right) ---
+        float panMin = _centerPan - _panClamp;
+        float panMax = _centerPan + _panClamp;
 
-        float currentYaw = _panTilt.PanAxis.Value;
-        float currentPitch = _panTilt.TiltAxis.Value;
-
-        _panTilt.PanAxis.Range = new Vector2(
-            currentYaw - _yawClamp,
-            currentYaw + _yawClamp
+        _panTilt.PanAxis.Value = Mathf.Clamp(
+            _panTilt.PanAxis.Value,
+            panMin,
+            panMax
         );
 
-        _panTilt.TiltAxis.Range = new Vector2(
-            currentPitch - _pitchClamp,
-            currentPitch + _pitchClamp
+        // --- TILT (up / down) ---
+        float tiltMin = _centerTilt - _tiltDownClamp - 10;
+        float tiltMax = _centerTilt + _tiltUpClamp + 30;
+
+        _panTilt.TiltAxis.Value = Mathf.Clamp(
+            _panTilt.TiltAxis.Value,
+            tiltMin,
+            tiltMax
         );
     }
 
-    public void Release()
+    private void CaptureLeverPush()
     {
-        if (!_isHolding)
-            return;
+        Debug.Log("Pan: " + _panTilt.PanAxis.Value);
+        Debug.Log("Tilt: " + _panTilt.TiltAxis.Value);
+    }
 
-        _isHolding = false;
-        _playerController.enabled = true;
+    private void ResetLeverPush()
+    {
 
-        if (_panTilt == null)
-            return;
-
-        _panTilt.PanAxis.Range = new Vector2(_originalYawMin, _originalYawMax);
-        _panTilt.TiltAxis.Range = new Vector2(_originalPitchMin, _originalPitchMax);
     }
 
 

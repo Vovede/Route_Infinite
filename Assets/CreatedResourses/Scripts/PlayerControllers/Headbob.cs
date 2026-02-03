@@ -6,7 +6,7 @@ using UnityEngine;
 public class Headbob : MonoBehaviour
 {
     [Header("Headbob parameters")]
-    [SerializeField] private bool _canDoBob = true;
+    public bool _canHeadbob = true;
     [SerializeField] private float _frequency = 2f;
     [SerializeField] private float _amplitude = 0.125f;
     private float _defaultYPosition;
@@ -22,7 +22,7 @@ public class Headbob : MonoBehaviour
 
     private void Update()
     {
-        if (_canDoBob)
+        if (_canHeadbob)
         {
             HandleHeadbob();
         }
