@@ -1,5 +1,9 @@
-using UnityEngine;
+using System.Runtime.InteropServices;
 using Unity.Cinemachine;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.Rendering;
 
 public class HoldableLever : MonoBehaviour
 {
@@ -13,6 +17,9 @@ public class HoldableLever : MonoBehaviour
     [SerializeField] private float _tiltDownClamp = 10f;
     [SerializeField][ReadOnlyInspector] private bool _isClamping = false;
 
+    private bool _pushCaptured;
+    [SerializeField] private UnityEvent _onCaptured;
+
     private PlayerMovementController _playerController;
     private GameObject _player;
 
@@ -22,8 +29,13 @@ public class HoldableLever : MonoBehaviour
     private float _centerPan;
     private float _centerTilt;
 
+    private float _minClampedPan;
+    private float _maxClampedPan;
+    private float _minClampedTilt;
+    private float _maxClampedTilt;
+
     private bool _isHolding;
-    private bool _canHeadbob;
+    private MovingPlatformHandler _movingPlatform;
 
     private void Awake()
     {
@@ -33,26 +45,27 @@ public class HoldableLever : MonoBehaviour
         _cmCamera = FindFirstObjectByType<CinemachineCamera>();
         _panTilt = _cmCamera.GetComponent<CinemachinePanTilt>();
 
-        _canHeadbob = _cmCamera.GetComponent<Headbob>()._canHeadbob;
+        _movingPlatform = _player.GetComponent<MovingPlatformHandler>();
     }
 
     private void Update()
     {
         if (_isClamping) ClampCamera();
         if (_isHolding) CaptureLeverPush();
+        if (_isHolding && _pushCaptured) ResetLeverPush();
     }
 
     public void StartInteraction()
     {
-        if (_isHolding)
-            return;
+        if (_isHolding) return;
+
+        if(_movingPlatform.activePlatform == null) return;
 
         SnapToClosestStandpoint();
         RotatePlayerOnce();
 
         _playerController.enabled = false;
         _isHolding = true;
-        _canHeadbob = false;
     }
 
     public void DiscardInteraction()
@@ -62,7 +75,6 @@ public class HoldableLever : MonoBehaviour
             _playerController.enabled = true;
             _isHolding = false;
             _isClamping = false;
-            _canHeadbob = true;
         }
     }
 
@@ -82,7 +94,7 @@ public class HoldableLever : MonoBehaviour
         }
 
         if (closest != null)
-            _player.transform.position = closest.position;
+            _player.transform.position = new Vector3(closest.position.x, _player.transform.position.y, closest.position.z);
     }
 
     private void RotatePlayerOnce()
@@ -111,7 +123,7 @@ public class HoldableLever : MonoBehaviour
         float yaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
 
         // Pitch: up/down
-        float pitch = -Mathf.Asin(localDir.y) * Mathf.Rad2Deg + 10;
+        float pitch = -Mathf.Asin(localDir.y) * Mathf.Rad2Deg;
 
         _panTilt.PanAxis.Value = yaw;
         _panTilt.TiltAxis.Value = pitch;
@@ -138,25 +150,41 @@ public class HoldableLever : MonoBehaviour
         );
 
         // --- TILT (up / down) ---
-        float tiltMin = _centerTilt - _tiltDownClamp - 10;
-        float tiltMax = _centerTilt + _tiltUpClamp + 30;
+        float tiltMin = _centerTilt - _tiltDownClamp;
+        float tiltMax = _centerTilt + _tiltUpClamp;
 
         _panTilt.TiltAxis.Value = Mathf.Clamp(
             _panTilt.TiltAxis.Value,
             tiltMin,
             tiltMax
         );
+        //Debug.Log(panMin); 
+        //Debug.Log(panMax);
+        //Debug.Log(tiltMin);
+        //Debug.Log(tiltMax);
+
+        _minClampedPan = panMin; // left
+        _maxClampedPan = panMax; // right
+        _minClampedTilt = tiltMin; // up
+        _maxClampedTilt = tiltMax; // down
     }
 
     private void CaptureLeverPush()
     {
-        Debug.Log("Pan: " + _panTilt.PanAxis.Value);
-        Debug.Log("Tilt: " + _panTilt.TiltAxis.Value);
+        //Debug.Log("Pan: " + _panTilt.PanAxis.Value + "\n" + "Tilt: " + _panTilt.TiltAxis.Value);
+        if (_panTilt.TiltAxis.Value > _maxClampedTilt - 10)
+        {
+            _pushCaptured = true;
+            _onCaptured.Invoke();
+        }
     }
 
     private void ResetLeverPush()
     {
-
+        if (_panTilt.TiltAxis.Value > _minClampedTilt + 10)
+        {
+            _pushCaptured = false;
+        }
     }
 
 

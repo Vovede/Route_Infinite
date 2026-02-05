@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController))]
@@ -6,9 +7,10 @@ public class MovingPlatformHandler : MonoBehaviour
     [SerializeField] private LayerMask _platformLayers;
 
     private CharacterController controller;
-    private Transform activePlatform;
+    [ReadOnlyInspector] public Transform activePlatform;
     private Vector3 lastPlatformPosition;
     private Quaternion lastPlatformRotation;
+    public Transform _groundCheck;
 
     private void Start()
     {
@@ -53,24 +55,25 @@ public class MovingPlatformHandler : MonoBehaviour
 
     private void CheckPlatform()
     {
-        RaycastHit hit;
-        // Пускаем луч вниз от центра контроллера
-        // Длина луча чуть больше половины высоты, чтобы доставать до пола
-        float rayLength = (controller.height / 2f) + 0.3f;
+        Collider[] hitColliders = Physics.OverlapSphere(_groundCheck.position, 0.3f, _platformLayers);
 
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, rayLength, _platformLayers))
+        if (hitColliders.Length > 0)
         {
-            // Если мы приземлились на новую платформу или сменили её
-            if (hit.transform != activePlatform)
+            foreach (var hitCollider in hitColliders)
             {
-                activePlatform = hit.transform;
-                lastPlatformPosition = activePlatform.position;
-                lastPlatformRotation = activePlatform.rotation;
+                if (LayerMask.LayerToName(hitCollider.gameObject.layer) == "Moving Platform")
+                {
+                    if (hitCollider.transform != activePlatform)
+                    {
+                        activePlatform = hitCollider.transform;
+                        lastPlatformPosition = activePlatform.position;
+                        lastPlatformRotation = activePlatform.rotation;
+                    }
+                }
             }
         }
         else
         {
-            // Мы в воздухе
             activePlatform = null;
         }
     }
