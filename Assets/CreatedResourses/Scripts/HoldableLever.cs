@@ -17,7 +17,7 @@ public class HoldableLever : MonoBehaviour
     [SerializeField] private float _tiltDownClamp = 10f;
     [SerializeField][ReadOnlyInspector] private bool _isClamping = false;
 
-    private bool _pushCaptured;
+    [SerializeField][ReadOnlyInspector] private bool _pushCaptured = false;
     [SerializeField] private UnityEvent _onCaptured;
 
     private PlayerMovementController _playerController;
@@ -34,7 +34,7 @@ public class HoldableLever : MonoBehaviour
     private float _minClampedTilt;
     private float _maxClampedTilt;
 
-    private bool _isHolding;
+    [SerializeField][ReadOnlyInspector] private bool _isHolding;
     private MovingPlatformHandler _movingPlatform;
 
     private void Awake()
@@ -51,8 +51,9 @@ public class HoldableLever : MonoBehaviour
     private void Update()
     {
         if (_isClamping) ClampCamera();
-        if (_isHolding) CaptureLeverPush();
+        if (_isHolding && !_pushCaptured) CaptureLeverPush();
         if (_isHolding && _pushCaptured) ResetLeverPush();
+        if (_isHolding) SnapToClosestStandpoint();
     }
 
     public void StartInteraction()
@@ -136,8 +137,30 @@ public class HoldableLever : MonoBehaviour
 
     private void ClampCamera()
     {
-        if (_panTilt == null)
+        if (_lookPoint == null || _panTilt == null)
             return;
+
+        Vector3 dir = _lookPoint.position - _cmCamera.transform.position;
+
+        if (dir.sqrMagnitude < 0.001f)
+            return;
+
+        // --- PLAYER ROTATION (flat) ---
+        Vector3 flatDir = dir;
+        flatDir.y = 0f;
+
+        if (flatDir.sqrMagnitude > 0.001f)
+            _player.transform.rotation = Quaternion.LookRotation(flatDir);
+
+        // --- CAMERA ROTATION (Pan/Tilt) ---
+
+        // Convert direction into local space of the player
+        Vector3 localDir = _player.transform.InverseTransformDirection(dir);
+
+        // Yaw: left/right
+        float yaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
+
+        _centerPan = yaw;
 
         // --- PAN (left / right) ---
         float panMin = _centerPan - _panClamp;
@@ -158,10 +181,6 @@ public class HoldableLever : MonoBehaviour
             tiltMin,
             tiltMax
         );
-        //Debug.Log(panMin); 
-        //Debug.Log(panMax);
-        //Debug.Log(tiltMin);
-        //Debug.Log(tiltMax);
 
         _minClampedPan = panMin; // left
         _maxClampedPan = panMax; // right
@@ -171,9 +190,10 @@ public class HoldableLever : MonoBehaviour
 
     private void CaptureLeverPush()
     {
-        //Debug.Log("Pan: " + _panTilt.PanAxis.Value + "\n" + "Tilt: " + _panTilt.TiltAxis.Value);
+        
         if (_panTilt.TiltAxis.Value > _maxClampedTilt - 10)
         {
+            Debug.Log("Max tilt: " + _maxClampedTilt + "\n" + "Tilt: " + _panTilt.TiltAxis.Value);
             _pushCaptured = true;
             _onCaptured.Invoke();
         }
@@ -181,8 +201,10 @@ public class HoldableLever : MonoBehaviour
 
     private void ResetLeverPush()
     {
-        if (_panTilt.TiltAxis.Value > _minClampedTilt + 10)
+        
+        if (_panTilt.TiltAxis.Value < _minClampedTilt + 10)
         {
+            Debug.Log("Min tilt: " + _minClampedTilt + "\n" + "Tilt: " + _panTilt.TiltAxis.Value);
             _pushCaptured = false;
         }
     }

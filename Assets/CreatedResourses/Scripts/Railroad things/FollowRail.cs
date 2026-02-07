@@ -24,7 +24,7 @@ public class FollowRail : MonoBehaviour
         var native = new NativeSpline(currentSpline, rail.transform.localToWorldMatrix);
         float distance = SplineUtility.GetNearestPoint(native, transform.position, out float3 nearest, out float t);
 
-        transform.position = nearest;
+        rb.MovePosition((Vector3)nearest);
 
         Vector3 forward = Vector3.Normalize(native.EvaluateTangent(t));
         Vector3 up = native.EvaluateUpVector(t);
@@ -33,17 +33,18 @@ public class FollowRail : MonoBehaviour
         var remappedUp = new Vector3(0, 1, 0);
         var axisRemapRotation = Quaternion.Inverse(Quaternion.LookRotation(remappedForward, remappedUp));
 
-        transform.rotation = Quaternion.LookRotation(forward, up) * axisRemapRotation;
+        Quaternion targetRotation = Quaternion.LookRotation(forward, up) * axisRemapRotation;
+        rb.MoveRotation(targetRotation);
 
-        Vector3 engineForward = transform.forward;
+        Vector3 engineForward = targetRotation * Vector3.forward;
 
-        if (Vector3.Dot(rb.linearVelocity, transform.forward) < 0)
-        {
-            engineForward *= -1;
-        }
-
-        rb.linearVelocity = rb.linearVelocity.magnitude * engineForward;
-
-        Debug.Log(rb.linearVelocity);
+        //if (Vector3.Dot(rb.linearVelocity, transform.forward) < 0)
+        //{
+        //    engineForward *= -1;
+        //}
+        //rb.linearVelocity = rb.linearVelocity.magnitude * engineForward;
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+        
+        //Debug.Log(rb.linearVelocity);
     }
 }
